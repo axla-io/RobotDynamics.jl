@@ -73,7 +73,7 @@ end
 function integrate(::Euler, model, x, u, t, h)
     xdot = dynamics(model, x, u, t)
     #c = 0.99
-    c = 0.9
+    c = 0.90
     damping = vcat(ones(7), c * ones(6))
     return x .* damping  + h * xdot
 end
@@ -81,7 +81,7 @@ end
 function integrate!(int::Euler, model, xn, x, u, t, h)
     dynamics!(model, xn, x, u, t)
     #c = 0.99
-    c = 0.9
+    c = 0.90
     damping = vcat(ones(7), c * ones(6))
     xn .*= h
     xn .+= x .* damping
@@ -143,6 +143,8 @@ function integrate(::RK3, model, x, u, t, h)
 end
 
 function integrate!(int::RK3, model, xn, x, u, t, h)
+    c = 0.9
+    damping = vcat(ones(7), c * ones(6))
     T = eltype(xn)
     k1, k2, k3 = getks(int, T)
     dynamics!(model, k1, x, u, t)
@@ -150,7 +152,7 @@ function integrate!(int::RK3, model, xn, x, u, t, h)
     dynamics!(model, k2, xn, u, t + h / 2)
     @. xn = x - k1 * h + 2 * k2 * h
     dynamics!(model, k3, xn, u, t + h)
-    @. xn = x + h * (k1 + 4k2 + k3) / 6
+    @. xn = x + h * (k1 + 4k2 + k3) / 6 .* damping
     return nothing
 end
 
@@ -286,14 +288,18 @@ getks(int::RK4, ::Type{T}) where {T} =
     int.k1[T]::Vector{T}, int.k2[T]::Vector{T}, int.k3[T]::Vector{T}, int.k4[T]::Vector{T}
 
 function integrate(::RK4, model, x, u, t, h)
+    c = 0.9
+    damping = vcat(ones(7), c * ones(6))
     k1 = dynamics(model, x, u, t) * h
     k2 = dynamics(model, x + k1 / 2, u, t + h / 2) * h
     k3 = dynamics(model, x + k2 / 2, u, t + h / 2) * h
     k4 = dynamics(model, x + k3, u, t + h) * h
-    x + (k1 + 2k2 + 2k3 + k4) / 6
+    x + (k1 + 2k2 + 2k3 + k4) / 6 .* damping
 end
 
 function integrate!(int::RK4, model, xn, x, u, t, h)
+    c = 0.9
+    damping = vcat(ones(7), c * ones(6))
     T = eltype(xn)
     k1, k2, k3, k4 = getks(int, T)
     dynamics!(model, k1, x, u, t)
@@ -303,7 +309,7 @@ function integrate!(int::RK4, model, xn, x, u, t, h)
     dynamics!(model, k3, xn, u, t + h / 2)
     @. xn = x + k3 * h
     dynamics!(model, k4, xn, u, t + h)
-    @. xn = x + h * (k1 + 2k2 + 2k3 + k4) / 6
+    @. xn = x + h * (k1 + 2k2 + 2k3 + k4) / 6 .* damping
     return nothing
 end
 
