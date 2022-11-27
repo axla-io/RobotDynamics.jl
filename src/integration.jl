@@ -72,13 +72,19 @@ end
 
 function integrate(::Euler, model, x, u, t, h)
     xdot = dynamics(model, x, u, t)
-    return x + h * xdot
+    #c = 0.99
+    c = 0.9
+    damping = vcat(ones(7), c * ones(6))
+    return x .* damping  + h * xdot
 end
 
 function integrate!(int::Euler, model, xn, x, u, t, h)
     dynamics!(model, xn, x, u, t)
+    #c = 0.99
+    c = 0.9
+    damping = vcat(ones(7), c * ones(6))
     xn .*= h
-    xn .+= x
+    xn .+= x .* damping
     return nothing
 end
 

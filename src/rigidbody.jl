@@ -275,6 +275,7 @@ function jacobian!(model::RigidBody{<:UnitQuaternion}, F, y, x, u, t)
     # Calculate the Jacobian wrt the wrench and multiply the blocks according to the sparsity
     F .= 0
     Jw = uview(get_data(F), 8:13, :)
+    z = KnotPoint(x,u,t, 0.1) # Added
     wrench_jacobian!(Jw, model, z)
     js = wrench_sparsity(model)
     if velocity_frame(model) == :world
