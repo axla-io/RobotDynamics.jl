@@ -134,10 +134,12 @@ getks(int::RK3, ::Type{T}) where {T} =
     int.k1[T]::Vector{T}, int.k2[T]::Vector{T}, int.k3[T]::Vector{T}
 
 function integrate(::RK3, model, x, u, t, h)
+    c = 0.9
+    damping = vcat(ones(7), c * ones(6))
     k1 = dynamics(model, x,            u, t      ) * h
     k2 = dynamics(model, x + k1 / 2,   u, t + h/2) * h
     k3 = dynamics(model, x - k1 + 2k2, u, t + h  ) * h
-    return x + (k1 + 4k2 + k3) / 6
+    return x + damping .* (k1 + 4k2 + k3) / 6
 end
 
 function integrate!(int::RK3, model, xn, x, u, t, h)
