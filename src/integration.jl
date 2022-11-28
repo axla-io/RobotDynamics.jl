@@ -74,7 +74,7 @@ function integrate(::Euler, model, x, u, t, h)
     xdot = dynamics(model, x, u, t)
     #c = 0.99
     c = 0.90
-    damping = vcat(ones(7), c * ones(6))
+    damping = vcat(ones(7), c * ones(6)) # Fixa detta lolololol
     return x .* damping  + h * xdot
 end
 
@@ -139,7 +139,7 @@ function integrate(::RK3, model, x, u, t, h)
     k1 = dynamics(model, x,            u, t      ) * h
     k2 = dynamics(model, x + k1 / 2,   u, t + h/2) * h
     k3 = dynamics(model, x - k1 + 2k2, u, t + h  ) * h
-    return x + damping .* (k1 + 4k2 + k3) / 6
+    return damping .* x +  (k1 + 4k2 + k3) / 6
 end
 
 function integrate!(int::RK3, model, xn, x, u, t, h)
@@ -152,7 +152,7 @@ function integrate!(int::RK3, model, xn, x, u, t, h)
     dynamics!(model, k2, xn, u, t + h / 2)
     @. xn = x - k1 * h + 2 * k2 * h
     dynamics!(model, k3, xn, u, t + h)
-    @. xn = x + h * (k1 + 4k2 + k3) / 6 .* damping
+    @. xn = damping .* x + h * (k1 + 4k2 + k3) / 6
     return nothing
 end
 
@@ -294,7 +294,7 @@ function integrate(::RK4, model, x, u, t, h)
     k2 = dynamics(model, x + k1 / 2, u, t + h / 2) * h
     k3 = dynamics(model, x + k2 / 2, u, t + h / 2) * h
     k4 = dynamics(model, x + k3, u, t + h) * h
-    x + (k1 + 2k2 + 2k3 + k4) / 6 .* damping
+    damping .* x + (k1 + 2k2 + 2k3 + k4) / 6
 end
 
 function integrate!(int::RK4, model, xn, x, u, t, h)
@@ -309,7 +309,7 @@ function integrate!(int::RK4, model, xn, x, u, t, h)
     dynamics!(model, k3, xn, u, t + h / 2)
     @. xn = x + k3 * h
     dynamics!(model, k4, xn, u, t + h)
-    @. xn = x + h * (k1 + 2k2 + 2k3 + k4) / 6 .* damping
+    @. xn = damping .* x + h * (k1 + 2k2 + 2k3 + k4) / 6
     return nothing
 end
 
