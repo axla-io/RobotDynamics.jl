@@ -616,7 +616,7 @@ function ImplicitNewtonCache(n::Integer, m::Integer)
     ipiv = zeros(BlasInt, n)
     A = zeros(n,n) 
     F = lu!(A, check=false)
-    iters = 10    # Default number of Newton iterations
+    iters = 1    # Default number of Newton iterations
     tol = 1e-12   # Default Newton tolerance
     ImplicitNewtonCache(J2, J1, y2, y1, z2, z1, ipiv, A, F, iters, tol)
 end
@@ -634,10 +634,16 @@ x_1 + h f(\\frac{1}{2}(x_1 + x_2), u_1, t + \\frac{1}{2} h) - x_2 = 0
 struct ImplicitMidpoint <: Implicit
     xmid::ADVector{Float64}
     cache::ImplicitNewtonCache
+    damping::AbstractVector{Float64}
+
 end
+
 function ImplicitMidpoint(n::Integer, m::Integer)
     cache = ImplicitNewtonCache(n, m)
-    ImplicitMidpoint(ADVector{Float64}(n), cache)
+    c = 0.5
+    n_pt = Int(n / 13)
+    damping = SVector{n}(vcat(ones(7 * n_pt), c * ones(6 * n_pt)))
+    ImplicitMidpoint(ADVector{Float64}(n), cache, damping)
 end
 
 getnewtoncache(integrator::ImplicitMidpoint) = integrator.cache
