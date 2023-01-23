@@ -32,7 +32,7 @@ struct ADVector{T}
 
     # Copy constructor
     # Does a deep copy of the cache dictionary
-    function ADVector(adv::ADVector{T}) where T
+    function ADVector(adv::ADVector{T}) where {T}
         new{T}(copy(adv.v), deepcopy(adv.d))
     end
 end
@@ -46,7 +46,7 @@ function Base.getindex(adv::ADVector, T::Type{<:ForwardDiff.Dual})
         return d
     end
 end
-Base.copy(adv::ADVector{T}) where T = ADVector(adv)  # calls copy constructor
+Base.copy(adv::ADVector{T}) where {T} = ADVector(adv)  # calls copy constructor
 
 ########################################
 # Explicit Methods
@@ -75,7 +75,7 @@ function integrate(::Euler, model, x, u, t, h)
     #c = 0.99
     c = 0.90
     damping = vcat(ones(7), c * ones(6))
-    return x .* damping  + h * xdot
+    return x .* damping + h * xdot
 end
 
 function integrate!(int::Euler, model, xn, x, u, t, h)
@@ -112,7 +112,7 @@ A third-order explicit Runge-Kutta method:
 \end{aligned}
 ```
 """
-struct RK3 <: Explicit 
+struct RK3 <: Explicit
     k1::ADVector{Float64}
     k2::ADVector{Float64}
     k3::ADVector{Float64}
@@ -136,9 +136,9 @@ getks(int::RK3, ::Type{T}) where {T} =
 function integrate(::RK3, model, x, u, t, h)
     c = 0.9
     damping = vcat(ones(7), c * ones(6))
-    k1 = dynamics(model, x,            u, t      ) * h
-    k2 = dynamics(model, x + k1 / 2,   u, t + h/2) * h
-    k3 = dynamics(model, x - k1 + 2k2, u, t + h  ) * h
+    k1 = dynamics(model, x, u, t) * h
+    k2 = dynamics(model, x + k1 / 2, u, t + h / 2) * h
+    k3 = dynamics(model, x - k1 + 2k2, u, t + h) * h
     return x + damping .* (k1 + 4k2 + k3) / 6
 end
 
@@ -160,8 +160,8 @@ function jacobian!(int::RK3, sig::StaticReturn, model, J, xn, x, u, t, h)
     n, m = dims(model)
     ix = SVector{n}(1:n)
     iu = SVector{m}(n+1:n+m)
-    k1 = dynamics(model, x,            u, t      ) * h
-    k2 = dynamics(model, x + k1 / 2,   u, t + h/2) * h
+    k1 = dynamics(model, x, u, t) * h
+    k2 = dynamics(model, x + k1 / 2, u, t + h / 2) * h
 
     jacobian!(model, J, xn, x, u, t)
     A1, B1 = J[ix, ix], J[ix, iu]
@@ -197,19 +197,19 @@ function jacobian!(int::RK3, sig::InPlace, model, J, xn, x, u, t, h)
     ix, iu = 1:n, n+1:n+m
 
     jacobian!(model, J, k1, x, u, t)
-    dynamics!(model,    k1, x, u, t)
+    dynamics!(model, k1, x, u, t)
     A1 .= @view J[ix, ix]
     B1 .= @view J[ix, iu]
 
     @. xn = x + k1 * h / 2
     jacobian!(model, J, k2, xn, u, t + h / 2)
-    dynamics!(model,    k2, xn, u, t + h / 2)
+    dynamics!(model, k2, xn, u, t + h / 2)
     A2 .= @view J[ix, ix]
     B2 .= @view J[ix, iu]
 
     @. xn = x - k1 * h + 2 * k2 * h
     jacobian!(model, J, k3, xn, u, t + h)
-    dynamics!(model,    k3, xn, u, t + h)
+    dynamics!(model, k3, xn, u, t + h)
     A3 .= @view J[ix, ix]
     B3 .= @view J[ix, iu]
 
@@ -223,7 +223,7 @@ function jacobian!(int::RK3, sig::InPlace, model, J, xn, x, u, t, h)
 
     # dA3 = A3 * (I - dA1 + 2 * dA2) * h
     mul!(dA3, A3, dA2, 2.0, 0.0)
-    mul!(dA3, A3, dA1,-1.0, 1.0)
+    mul!(dA3, A3, dA1, -1.0, 1.0)
     dA3 .+= A3
     dA3 .*= h
 
@@ -238,7 +238,7 @@ function jacobian!(int::RK3, sig::InPlace, model, J, xn, x, u, t, h)
     # dB3 = B3 * h + A3 * (2dB2 - dB1) * h
     dB3 .= B3
     mul!(dB3, A3, dB2, 2.0, 1.0)
-    mul!(dB3, A3, dB1,-1.0, 1.0)
+    mul!(dB3, A3, dB1, -1.0, 1.0)
     dB3 .*= h
 
     @. J[ix, ix] = (dA1 + 4dA2 + dA3) / 6
@@ -361,19 +361,19 @@ function jacobian!(int::RK4, sig::InPlace, model, J, xn, x, u, t, h)
     ix, iu = 1:n, n+1:n+m
 
     jacobian!(model, J, k1, x, u, t)
-    dynamics!(model,    k1, x, u, t)
+    dynamics!(model, k1, x, u, t)
     A1 .= @view J[ix, ix]
     B1 .= @view J[ix, iu]
 
     @. xn = x + k1 * h / 2
     jacobian!(model, J, k2, xn, u, t + h / 2)
-    dynamics!(model,    k2, xn, u, t + h / 2)
+    dynamics!(model, k2, xn, u, t + h / 2)
     A2 .= @view J[ix, ix]
     B2 .= @view J[ix, iu]
 
     @. xn = x + k2 * h / 2
     jacobian!(model, J, k3, xn, u, t + h / 2)
-    dynamics!(model,    k3, xn, u, t + h / 2)
+    dynamics!(model, k3, xn, u, t + h / 2)
     A3 .= @view J[ix, ix]
     B3 .= @view J[ix, iu]
 
@@ -433,9 +433,9 @@ end
 ########################################
 
 # Use Newton's method to solve for the next state for implicit dynamics
-function integrate(integrator::Implicit, model::ImplicitDynamicsModel, 
-                   z::AbstractKnotPoint{Nx,Nu}) where {Nx,Nu} 
-    cache = getnewtoncache(integrator) 
+function integrate(integrator::Implicit, model::ImplicitDynamicsModel,
+    z::AbstractKnotPoint{Nx,Nu}) where {Nx,Nu}
+    cache = getnewtoncache(integrator)
     newton_iters = cache.newton_iters
     tol = cache.newton_tol
 
@@ -445,7 +445,7 @@ function integrate(integrator::Implicit, model::ImplicitDynamicsModel,
     y1 = cache.y1
     z1 = z
     z2 = StaticKnotPoint(z)
-    ix = SVector{Nx}(1:Nx) 
+    ix = SVector{Nx}(1:Nx)
 
     # Use the current state as the current guess
     xn = state(z1)
@@ -459,9 +459,9 @@ function integrate(integrator::Implicit, model::ImplicitDynamicsModel,
         r = dynamics_error(integrator, model.continuous_dynamics, z2, z1)
 
         # Calculate the Jacobian wrt x2
-        dynamics_error_jacobian!(StaticReturn(), diff, model, 
-                                 J2, J1, y2, y1, z2, z1)
-        A = J2[ix, ix] 
+        dynamics_error_jacobian!(StaticReturn(), diff, model,
+            J2, J1, y2, y1, z2, z1)
+        A = J2[ix, ix]
 
         if norm(r) < tol
             break
@@ -476,13 +476,13 @@ function integrate(integrator::Implicit, model::ImplicitDynamicsModel,
     return xn
 end
 
-function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn, 
-                    z::AbstractKnotPoint)
+function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn,
+    z::AbstractKnotPoint)
     integrate!(integrator, model, xn, state(z), control(z), z.t, z.dt)
 end
-function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn, 
-                    x, u, t, h)
-    cache = getnewtoncache(integrator) 
+function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn,
+    x, u, t, h)
+    cache = getnewtoncache(integrator)
     newton_iters = cache.newton_iters
     tol = cache.newton_tol
 
@@ -495,7 +495,7 @@ function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn,
     z1.dt = h
     copyto!(z2, z1)
 
-    n,m = dims(model)
+    n, m = dims(model)
     J2 = cache.J2
     J1 = cache.J1
     r = cache.y2
@@ -521,7 +521,7 @@ function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn,
 
         # Calculate the Jacobian wrt x2
         dynamics_error_jacobian!(InPlace(), diff, model, J2, J1, r, dx, z2, z1)
-        A .= Aview 
+        A .= Aview
 
         # Get the step
         dx .= r
@@ -535,10 +535,10 @@ function integrate!(integrator::Implicit, model::ImplicitDynamicsModel, xn,
 end
 
 # Use Implicit Function Theorem to calculate the dynamics Jacobians
-function jacobian!(integrator::Implicit, ::StaticReturn, diff::DiffMethod, 
-                   model::ImplicitDynamicsModel, J, y, z::AbstractKnotPoint{Nx,Nu}
-                   ) where {Nx,Nu}
-    cache = getnewtoncache(integrator) 
+function jacobian!(integrator::Implicit, ::StaticReturn, diff::DiffMethod,
+    model::ImplicitDynamicsModel, J, y, z::AbstractKnotPoint{Nx,Nu}
+) where {Nx,Nu}
+    cache = getnewtoncache(integrator)
     J2 = cache.J2
     J1 = cache.J1
     ix = SVector{Nx}(1:Nx)
@@ -551,17 +551,17 @@ function jacobian!(integrator::Implicit, ::StaticReturn, diff::DiffMethod,
     else
         @debug "Using cached Static Factorization"
     end
-    A2 = J2[ix,ix]
-    Jstatic = SMatrix{Nx,Nx+Nu}(J1)
+    A2 = J2[ix, ix]
+    Jstatic = SMatrix{Nx,Nx + Nu}(J1)
     J .= A2 \ Jstatic
     J .*= -1
     return
 end
 
-function jacobian!(integrator::Implicit, ::InPlace, diff::DiffMethod, 
-                   model::ImplicitDynamicsModel, J, y, z::AbstractKnotPoint)
-    n,m = dims(z)
-    cache = getnewtoncache(integrator) 
+function jacobian!(integrator::Implicit, ::InPlace, diff::DiffMethod,
+    model::ImplicitDynamicsModel, J, y, z::AbstractKnotPoint)
+    n, m = dims(z)
+    cache = getnewtoncache(integrator)
     J1 = cache.J1
 
     aresame = maxdiff(cache.z2, z) < √eps()
@@ -601,24 +601,173 @@ mutable struct ImplicitNewtonCache
     z1::KnotPoint{Any,Any,Vector{Float64},Float64}
     ipiv::Vector{BlasInt}
     A::Matrix{Float64}
-    F::LinearAlgebra.LU{Float64, Matrix{Float64}} 
+    F::LinearAlgebra.LU{Float64,Matrix{Float64}}
     newton_iters::Int    # number of newton iterations
     newton_tol::Float64  # Newton tolerance
 end
+
 function ImplicitNewtonCache(n::Integer, m::Integer)
-    J2 = zeros(n,n+m)
-    J1 = zeros(n,n+m)
+    J2 = zeros(n, n + m)
+    J1 = zeros(n, n + m)
     y2 = zeros(n)
     y1 = zeros(n)
-    v = zeros(n+m)
+    v = zeros(n + m)
     z2 = StaticKnotPoint{Any,Any}(n, m, v, 0.0, NaN)
     z1 = KnotPoint{Any,Any}(n, m, copy(v), 0.0, NaN)
     ipiv = zeros(BlasInt, n)
-    A = zeros(n,n) 
+    A = zeros(n, n)
     F = lu!(A, check=false)
-    iters = 1    # Default number of Newton iterations
+    iters = 2   # Default number of Newton iterations
     tol = 1e-12   # Default Newton tolerance
     ImplicitNewtonCache(J2, J1, y2, y1, z2, z1, ipiv, A, F, iters, tol)
+end
+
+
+"""
+    FullyImplicitMidpoint
+
+"""
+struct FullyImplicitMidpoint <: Implicit
+    xmid::ADVector{Float64}
+    temp_dyn::ADVector{Float64}
+    cache::ImplicitNewtonCache
+    damping::AbstractVector{Float64}
+end
+
+function FullyImplicitMidpoint(n::Integer, m::Integer)
+    cache = ImplicitNewtonCache(n, m)
+    c = 0.99
+    n_pt = Int(n / 13)
+    damping = SVector{n}(vcat(ones(7 * n_pt), c * ones(6 * n_pt)))
+    FullyImplicitMidpoint(ADVector{Float64}(n), ADVector{Float64}(n), cache, damping)
+end
+
+getnewtoncache(integrator::FullyImplicitMidpoint) = integrator.cache
+
+function dynamics_error(
+    ::FullyImplicitMidpoint,
+    model::ContinuousDynamics,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+    xmid = x2 - dynamics(model, x2, u2, t + h) * h / 2
+    fmid = dynamics(model, xmid, u1, t + h / 2)
+    x1 .* int.damping + h * fmid - x2
+end
+
+function dynamics_error!(
+    int::FullyImplicitMidpoint,
+    model::ContinuousDynamics,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    T = eltype(y2)
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+    xmid = int.xmid[T]::Vector{T}
+    temp_dyn = int.temp_dyn[T]::Vector{T}
+
+    dynamics!(model, temp_dyn, x2, u2, t + h)
+
+    @. xmid = x2 - temp_dyn * h / 2
+    dynamics!(model, y2, xmid, u1, t + h / 2)
+    @. y2 = x1 .* int.damping + h * y2 - x2
+    return nothing
+end
+
+
+function dynamics_error_jacobian!(
+    int::FullyImplicitMidpoint,
+    ::StaticReturn,
+    model::ContinuousDynamics,
+    J2,
+    J1,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    n, m = dims(model)
+    ix = SVector{n}(1:n)
+    iu = SVector{m}(n+1:n+m)
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+
+    temp_dyn = dynamics(model, x2, u2, t + h) * h / 2
+    jacobian!(model, J1, y1, x2, u2, t + h) # Inner jacobian
+    # Get d_xmid/dx2
+    J1 = -J1 * h / 2
+    for i = 1:n
+        J1[i, i] += 1.0
+    end
+
+    xmid = x2 - temp_dyn
+    jacobian!(model, J2, y1, xmid, u1, t) # Outer jacobian
+
+    J2 .*= h
+    J2[ix, ix] = J2[ix, ix] * J1[ix, ix] # Multiply inner and outer jacobian
+    #J2 .*= J1
+    J2[ix, iu] .= 0
+
+    # This can probably be done in a better way
+    J1 .*= 0.0
+    for i = 1:n
+        J1[i, i] = 1.0
+        J2[i, i] -= 1.0
+    end
+    return nothing
+end
+
+function dynamics_error_jacobian!(
+    int::FullyImplicitMidpoint,
+    ::InPlace,
+    model::ContinuousDynamics,
+    J2,
+    J1,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    n, m = dims(model)
+    ix = 1:n
+    iu = n+1:n+m
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+    xmid = int.xmid[Float64]
+    temp_dyn = int.temp_dyn[Float64]
+
+    @. temp_dyn = dynamics(model, x2, u2, t + h) * h / 2
+    jacobian!(model, J1, y1, x2, u2, t + h) # Inner jacobian
+    # Get d_xmid/dx2
+    J1 = -J1 * h / 2
+    for i = 1:n
+        J1[i, i] += 1.0
+    end
+
+    @. xmid = x2 - temp_dyn
+    jacobian!(model, J2, y1, xmid, u1, t) # Outer jacobian
+    J2 .*= h
+    A1 = view(J1, ix, ix)
+    A2 = view(J2, ix, ix)
+    A2 = A2 * A1
+    #J2 .*= J1
+    view(J2, ix, iu) .= 0
+    # This can probably be done in a better way
+    J1 .*= 0.0
+    for i = 1:n
+        J1[i, i] = 1.0
+        J2[i, i] -= 1.0
+    end
+    return nothing
 end
 
 """
@@ -629,13 +778,12 @@ good performance with few calls to the dynamics.
 
 ```math
 x_1 + h f(\\frac{1}{2}(x_1 + x_2), u_1, t + \\frac{1}{2} h) - x_2 = 0
-````
+```
 """
 struct ImplicitMidpoint <: Implicit
     xmid::ADVector{Float64}
     cache::ImplicitNewtonCache
     damping::AbstractVector{Float64}
-
 end
 
 function ImplicitMidpoint(n::Integer, m::Integer)
@@ -704,12 +852,12 @@ function dynamics_error_jacobian!(
     jacobian!(model, J1, y1, xmid, u1, t)
 
     J1 .*= h
-    J1[ix,ix] ./= 2
-    J2[ix,ix] .= J1[ix,ix]
-    J2[ix,iu] .= 0
+    J1[ix, ix] ./= 2
+    J2[ix, ix] .= J1[ix, ix]
+    J2[ix, iu] .= 0
     for i = 1:n
-        J1[i,i] += 1.0
-        J2[i,i] -= 1.0
+        J1[i, i] += 1.0
+        J2[i, i] -= 1.0
     end
     return nothing
 end
@@ -726,8 +874,8 @@ function dynamics_error_jacobian!(
     z1::AbstractKnotPoint,
 )
     n, m = dims(model)
-    ix = 1:n 
-    iu = n+1:n+m 
+    ix = 1:n
+    iu = n+1:n+m
     t, h = time(z1), timestep(z1)
     x1, u1 = state(z1), control(z1)
     x2, u2 = state(z2), control(z2)
@@ -742,8 +890,221 @@ function dynamics_error_jacobian!(
     A2 .= A1
     view(J2, ix, iu) .= 0
     for i = 1:n
-        J1[i,i] += 1.0
-        J2[i,i] -= 1.0
+        J1[i, i] += 1.0
+        J2[i, i] -= 1.0
     end
+    return nothing
+end
+
+"""
+    BackwardEuler
+
+"""
+struct BackwardEuler{N} <: Implicit
+    cache::ImplicitNewtonCache
+    damping::SVector{N, Float64}
+end
+
+function BackwardEuler(n::Integer, m::Integer)
+    cache = ImplicitNewtonCache(n, m)
+    c = 0.9
+    n_pt = Int(n / 13)
+    damping = SVector{n, Float64}(vcat(ones(7 * n_pt), c * ones(6 * n_pt)))
+    BackwardEuler{n}(cache, damping)
+end
+
+getnewtoncache(integrator::BackwardEuler) = integrator.cache
+
+function dynamics_error(
+    ::BackwardEuler,
+    model::ContinuousDynamics,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+    fx2 = dynamics(model, x2, u1, t)
+    x1 .* int.damping + h * fx2 - x2
+end
+
+function dynamics_error!(
+    int::BackwardEuler,
+    model::ContinuousDynamics,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    T = eltype(y2)
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+
+    dynamics!(model, y2, x2, u1, t)
+    @. y2 = x1 .* int.damping + h * y2 - x2 # dispatch
+    return nothing
+end
+
+function dynamics_error_jacobian!(
+    int::BackwardEuler,
+    ::StaticReturn,
+    model::ContinuousDynamics,
+    J2,
+    J1,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    n, m = dims(model)
+    ix = SVector{n}(1:n)
+    iu = SVector{m}(n+1:n+m)
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+
+    jacobian!(model, J2, y1, x2, u1, t)
+
+    J2 .*= h
+    J2[ix, iu] .= 0
+    J1 .= 0
+    for i = 1:n
+        J1[i, i] = 1.0
+        J2[i, i] -= 1.0
+    end
+    return nothing
+end
+
+function dynamics_error_jacobian!(
+    int::BackwardEuler,
+    ::InPlace,
+    model::ContinuousDynamics,
+    J2,
+    J1,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    n, m = dims(model)
+    ix = 1:n
+    iu = n+1:n+m
+    t, h = time(z1), timestep(z1)
+    x1, u1 = state(z1), control(z1)
+    x2, u2 = state(z2), control(z2)
+    jacobian!(model, J2, y1, x2, u1, t)
+
+    J2 .*= h
+    view(J2, ix, iu) .= 0
+    J1 .= 0
+    for i = 1:n
+        J1[i, i] = 1.0
+        J2[i, i] -= 1.0
+    end
+
+    return nothing
+end
+
+
+"""
+    SteadyState
+
+"""
+struct SteadyState <: Implicit
+    cache::ImplicitNewtonCache
+    damping::AbstractVector{Float64}
+end
+
+function SteadyState(n::Integer, m::Integer)
+    cache = ImplicitNewtonCache(n, m)
+    c = 0.9
+    n_pt = Int(n / 13)
+    damping = SVector{n}(vcat(ones(7 * n_pt), c * ones(6 * n_pt)))
+    SteadyState(cache, damping)
+end
+
+getnewtoncache(integrator::SteadyState) = integrator.cache
+
+function dynamics_error(
+    ::SteadyState,
+    model::ContinuousDynamics,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    t, h = time(z1), timestep(z1)
+    x2, u2 = state(z2), control(z2)
+    fx2 = dynamics(model, x2, u2, t + h)
+    fx2 - x2
+end
+
+function dynamics_error!(
+    int::SteadyState,
+    model::ContinuousDynamics,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    T = eltype(y2)
+    t, h = time(z1), timestep(z1)
+    x2, u2 = state(z2), control(z2)
+
+    dynamics!(model, y2, x2, u2, t + h)
+    @. y2 = y2 - x2
+    return nothing
+end
+
+function dynamics_error_jacobian!(
+    int::SteadyState,
+    ::StaticReturn,
+    model::ContinuousDynamics,
+    J2,
+    J1,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    n, m = dims(model)
+    ix = SVector{n}(1:n)
+    iu = SVector{m}(n+1:n+m)
+    t, h = time(z1), timestep(z1)
+    x2, u2 = state(z2), control(z2)
+
+    jacobian!(model, J2, y1, x2, u2, t + h)
+
+    J1 .*=0.0
+    J2[ix, iu] .= 0
+    for i = 1:n
+        J2[i, i] -= 1.0
+    end
+    return nothing
+end
+
+function dynamics_error_jacobian!(
+    int::SteadyState,
+    ::InPlace,
+    model::ContinuousDynamics,
+    J2,
+    J1,
+    y2,
+    y1,
+    z2::AbstractKnotPoint,
+    z1::AbstractKnotPoint,
+)
+    n, m = dims(model)
+    ix = 1:n
+    iu = n+1:n+m
+    t, h = time(z1), timestep(z1)
+    x2, u2 = state(z2), control(z2)
+    jacobian!(model, J2, y1, x2, u2, t+h)
+
+    view(J2, ix, iu) .= 0
+    J1 .*=0.0
+    for i = 1:n
+        J2[i, i] -= 1.0
+    end
+
     return nothing
 end
