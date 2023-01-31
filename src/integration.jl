@@ -617,7 +617,7 @@ function ImplicitNewtonCache(n::Integer, m::Integer)
     ipiv = zeros(BlasInt, n)
     A = zeros(n, n)
     F = lu!(A, check=false)
-    iters = 2   # Default number of Newton iterations
+    iters = 10   # Default number of Newton iterations
     tol = 1e-12   # Default Newton tolerance
     ImplicitNewtonCache(J2, J1, y2, y1, z2, z1, ipiv, A, F, iters, tol)
 end
